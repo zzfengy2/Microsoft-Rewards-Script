@@ -62,7 +62,7 @@ export class QueryCore {
     async queryManager(options: QueryManagerOptions = {}): Promise<string[]> {
         const {
             shuffle = false,
-            sourceOrder = ['google', 'wikipedia', 'wikirandom', 'hackernews', 'reddit', 'local'],
+            sourceOrder = ['google', 'wikipedia', 'local'],
             related = true,
             langCode = 'en',
             geoLocale = 'US'
