@@ -62,7 +62,7 @@ export class QueryCore {
     async queryManager(options: QueryManagerOptions = {}): Promise<string[]> {
         const {
             shuffle = false,
-            sourceOrder = ['google', 'wikipedia', 'local'],
+            sourceOrder = ['local', 'google', 'wikipedia'],
             related = true,
             langCode = 'en',
             geoLocale = 'US'
@@ -195,7 +195,7 @@ export class QueryCore {
 
             const mapped = trendsData.map(q => [q[0], q[9]!.slice(1)])
 
-            if (mapped.length < 90 && geoLocale !== 'US') {
+            if (mapped.length < 90 && geoLocale !== 'US' && geoLocale !== 'CN') {
                 return this.getGoogleTrends('US')
             }
 
