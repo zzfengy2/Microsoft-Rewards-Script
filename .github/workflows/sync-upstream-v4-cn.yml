@@ -1,0 +1,116 @@
+# 自动同步上游 v4 + 应用中文修改
+
+name: Sync Upstream v4 & Apply CN Patches
+
+on:
+  schedule:
+    # 每天 UTC 2:00 (北京时间 10:00) 检查一次
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # 允许手动触发
+    inputs:
+      force_sync:
+        description: '强制同步（即使没有上游更新）'
+        required: false
+        default: 'false'
+        type: string
+
+jobs:
+  sync-and-patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout 当前仓库
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 添加上游仓库
+        run: |
+          git remote add upstream https://github.com/TheNetsky/Microsoft-Rewards-Script.git || true
+          git fetch upstream v4 --depth=1
+
+      - name: 检查上游是否有新提交
+        id: check
+        run: |
+          UPSTREAM_HASH=$(git rev-parse upstream/v4)
+          MERGE_BASE=$(git merge-base HEAD upstream/v4)
+          
+          echo "upstream_hash=$UPSTREAM_HASH" >> $GITHUB_OUTPUT
+          echo "merge_base=$MERGE_BASE" >> $GITHUB_OUTPUT
+          
+          if [ "$UPSTREAM_HASH" = "$MERGE_BASE" ] && [ "${{ inputs.force_sync }}" != "true" ]; then
+            echo "has_updates=false" >> $GITHUB_OUTPUT
+            echo "上游没有新提交，跳过同步"
+          else
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+            echo "检测到上游更新，准备同步"
+          fi
+
+      - name: 创建同步分支
+        if: steps.check.outputs.has_updates == 'true'
+        run: |
+          DATE_TAG=$(date +%Y%m%d-%H%M)
+          BRANCH="sync-upstream-${DATE_TAG}"
+          echo "sync_branch=$BRANCH" >> $GITHUB_OUTPUT
+          
+          git checkout -b "$BRANCH"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 合并上游更新（冲突时全部以上游为准）
+          git merge upstream/v4 --no-edit -X theirs || {
+            echo "合并冲突，使用上游版本"
+            git checkout --theirs .
+            git add .
+            git commit -m "Merge upstream/v4 (conflicts resolved with upstream)"
+          }
+          
+          echo "branchname=$BRANCH" >> $GITHUB_OUTPUT
+        id: branch
+
+      - name: 应用中文修改
+        if: steps.check.outputs.has_updates == 'true'
+        run: |
+          # 1. 替换搜索关键词为中文
+          cp ./patches/search-queries-zh.json ./src/functions/search-queries.json || true
+          
+          # 2. 修改 QueryEngine.ts - 去掉国内不适用的查询源
+          sed -i "s/sourceOrder = \['google', 'wikipedia', 'wikirandom', 'hackernews', 'reddit', 'local'\]/sourceOrder = ['google', 'wikipedia', 'local']/" ./src/functions/QueryEngine.ts || true
+          
+          # 3. 修改 env.example - 默认中国区
+          sed -i 's|#ACCOUNT_1_GEO_LOCALE=auto|ACCOUNT_1_GEO_LOCALE=CN    # 中国地区设为CN|' ./env.example || true
+          sed -i 's|#ACCOUNT_1_LANG_CODE=en|ACCOUNT_1_LANG_CODE=zh    # 中文设为zh|' ./env.example || true
+
+      - name: 提交中文修改
+        if: steps.check.outputs.has_updates == 'true'
+        run: |
+          git add -A
+          if git diff --staged --quiet; then
+            echo "没有新修改需要提交"
+          else
+            git commit -m "[CN] 应用中国区适配 v4 - 中文搜索词 + 精简查询源 + 默认CN"
+            git push origin "${{ steps.branch.outputs.branchname }}" --force
+          fi
+
+      - name: 创建 Pull Request
+        if: steps.check.outputs.has_updates == 'true'
+        uses: repo-sync/pull-request@v2
+        with:
+          source_branch: "${{ steps.branch.outputs.branchname }}"
+          destination_branch: "v4-cn"  # 中国版主分支
+          pr_title: "[自动同步 v4] 合并上游更新并应用中文适配"
+          pr_body: |
+            ## 📦 自动同步上游更新 v4
+            
+            上游 Hash: `${{ steps.check.outputs.upstream_hash }}`
+            
+            ### 🔧 自动应用的中文修改:
+            1. ✅ `search-queries.json` → 替换为中文搜索关键词 (300+ 条)
+            2. ✅ `QueryEngine.ts` → 查询引擎精简为 google + wikipedia + local
+            3. ✅ `env.example` → 默认 geoLocale=CN, langCode=zh
+          pr_reviewer: ""
+          pr_assignee: ""
+          github_token: ${{ secrets.GITHUB_TOKEN }}
