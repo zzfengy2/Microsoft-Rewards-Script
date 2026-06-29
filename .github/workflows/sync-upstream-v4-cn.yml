@@ -30,23 +30,23 @@ jobs:
       - name: 添加上游仓库
         run: |
           git remote add upstream https://github.com/TheNetsky/Microsoft-Rewards-Script.git || true
-          git fetch upstream v4 --depth=1
+          git fetch upstream v4
 
       - name: 检查上游是否有新提交
         id: check
         run: |
           UPSTREAM_HASH=$(git rev-parse upstream/v4)
-          MERGE_BASE=$(git merge-base HEAD upstream/v4)
+          AHEAD_COUNT=$(git rev-list --count HEAD..upstream/v4 || echo "0")
           
           echo "upstream_hash=$UPSTREAM_HASH" >> $GITHUB_OUTPUT
-          echo "merge_base=$MERGE_BASE" >> $GITHUB_OUTPUT
+          echo "ahead_count=$AHEAD_COUNT" >> $GITHUB_OUTPUT
           
-          if [ "$UPSTREAM_HASH" = "$MERGE_BASE" ] && [ "${{ inputs.force_sync }}" != "true" ]; then
+          if [ "$AHEAD_COUNT" -eq 0 ] && [ "${{ inputs.force_sync }}" != "true" ]; then
             echo "has_updates=false" >> $GITHUB_OUTPUT
             echo "上游没有新提交，跳过同步"
           else
             echo "has_updates=true" >> $GITHUB_OUTPUT
-            echo "检测到上游更新，准备同步"
+            echo "检测到上游有 $AHEAD_COUNT 个新提交，准备同步"
           fi
 
       - name: 创建同步分支
@@ -105,11 +105,12 @@ jobs:
           pr_body: |
             ## 📦 自动同步上游更新 v4
             
+            上游领先提交: `${{ steps.check.outputs.ahead_count }}` 个
             上游 Hash: `${{ steps.check.outputs.upstream_hash }}`
             
             ### 🔧 自动应用的中文修改:
             1. ✅ `search-queries.json` → 替换为中文搜索关键词 (300+ 条)
-            2. ✅ `QueryEngine.ts` → 查询引擎精简为 google + wikipedia + local
+            2. ✅ `QueryEngine.ts` → 查询引擎精简为 local + google + wikipedia
             3. ✅ `env.example` → 默认 geoLocale=CN, langCode=zh
           pr_reviewer: ""
           pr_assignee: ""
