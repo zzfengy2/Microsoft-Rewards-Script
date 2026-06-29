@@ -85,18 +85,21 @@ jobs:
           sed -i 's|#ACCOUNT_1_LANG_CODE=en|ACCOUNT_1_LANG_CODE=zh    # 中文设为zh|' ./env.example || true
 
       - name: 提交中文修改
+        id: commit
         if: steps.check.outputs.has_updates == 'true'
         run: |
           git add -A
-          if git diff --staged --quiet; then
-            echo "没有新修改需要提交"
+          if git diff --staged --quiet && git diff --quiet origin/v4-cn..HEAD; then
+            echo "no_changes=true" >> $GITHUB_OUTPUT
+            echo "没有变更，跳过 PR"
           else
+            echo "no_changes=false" >> $GITHUB_OUTPUT
             git commit -m "[CN] 应用中国区适配 v4 - 中文搜索词 + 精简查询源 + 默认CN"
             git push origin "${{ steps.branch.outputs.branchname }}" --force
           fi
 
       - name: 创建 Pull Request
-        if: steps.check.outputs.has_updates == 'true'
+        if: steps.check.outputs.has_updates == 'true' && steps.commit.outputs.no_changes != 'true'
         uses: repo-sync/pull-request@v2
         with:
           source_branch: "${{ steps.branch.outputs.branchname }}"
