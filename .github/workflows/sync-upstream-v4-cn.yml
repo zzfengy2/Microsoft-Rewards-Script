@@ -101,7 +101,7 @@ jobs:
       - name: 创建 Pull Request
         if: steps.check.outputs.has_updates == 'true' && steps.commit.outputs.no_changes != 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           gh pr create \
             --base v4-cn \
