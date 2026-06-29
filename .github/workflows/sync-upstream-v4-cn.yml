@@ -100,21 +100,19 @@ jobs:
 
       - name: 创建 Pull Request
         if: steps.check.outputs.has_updates == 'true' && steps.commit.outputs.no_changes != 'true'
-        uses: repo-sync/pull-request@v2
-        with:
-          source_branch: "${{ steps.branch.outputs.branchname }}"
-          destination_branch: "v4-cn"  # 中国版主分支
-          pr_title: "[自动同步 v4] 合并上游更新并应用中文适配"
-          pr_body: |
-            ## 📦 自动同步上游更新 v4
-            
-            上游领先提交: `${{ steps.check.outputs.ahead_count }}` 个
-            上游 Hash: `${{ steps.check.outputs.upstream_hash }}`
-            
-            ### 🔧 自动应用的中文修改:
-            1. ✅ `search-queries.json` → 替换为中文搜索关键词 (300+ 条)
-            2. ✅ `QueryEngine.ts` → 查询引擎精简为 local + google + wikipedia
-            3. ✅ `env.example` → 默认 geoLocale=CN, langCode=zh
-          pr_reviewer: ""
-          pr_assignee: ""
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr create \
+            --base v4-cn \
+            --head "${{ steps.branch.outputs.branchname }}" \
+            --title "[自动同步 v4] 合并上游更新并应用中文适配" \
+            --body "## 📦 自动同步上游更新 v4
+
+          上游领先提交: \`${{ steps.check.outputs.ahead_count }}\` 个
+          上游 Hash: \`${{ steps.check.outputs.upstream_hash }}\`
+
+          ### 🔧 自动应用的中文修改:
+          1. ✅ \`search-queries.json\` → 替换为中文搜索关键词 (300+ 条)
+          2. ✅ \`QueryEngine.ts\` → 查询引擎精简为 local + google + wikipedia
+          3. ✅ \`env.example\` → 默认 geoLocale=CN, langCode=zh"
