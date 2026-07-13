@@ -6,7 +6,7 @@ on:
   schedule:
     # 每天 UTC 2:00 (北京时间 10:00) 检查一次
     - cron: '0 2 * * *'
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
     inputs:
       force_sync:
         description: '强制同步（即使没有上游更新）'
@@ -21,23 +21,32 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout 当前仓库
+      - name: Checkout v4-cn
         uses: actions/checkout@v4
         with:
+          ref: v4-cn
           fetch-depth: 0
 
-      - name: 添加上游仓库
+      - name: 配置 Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: 添加并拉取上游 v4
         run: |
           git remote add upstream https://github.com/TheNetsky/Microsoft-Rewards-Script.git || true
           git fetch upstream v4
+          git fetch origin v4-cn
 
       - name: 检查上游是否有新提交
         id: check
         run: |
           UPSTREAM_HASH=$(git rev-parse upstream/v4)
+          LOCAL_HASH=$(git rev-parse HEAD)
           AHEAD_COUNT=$(git rev-list --count HEAD..upstream/v4 || echo "0")
           
           echo "upstream_hash=$UPSTREAM_HASH" >> $GITHUB_OUTPUT
+          echo "local_hash=$LOCAL_HASH" >> $GITHUB_OUTPUT
           echo "ahead_count=$AHEAD_COUNT" >> $GITHUB_OUTPUT
           
           if [ "$AHEAD_COUNT" -eq 0 ] && [ "${{ inputs.force_sync }}" != "true" ]; then
@@ -48,62 +57,44 @@ jobs:
             echo "检测到上游有 $AHEAD_COUNT 个新提交，准备同步"
           fi
 
-      - name: 创建同步分支
+      - name: 合并上游 v4
         if: steps.check.outputs.has_updates == 'true'
         run: |
-          DATE_TAG=$(date +%Y%m%d-%H%M)
-          BRANCH="sync-upstream-${DATE_TAG}"
-          echo "sync_branch=$BRANCH" >> $GITHUB_OUTPUT
-          
-          git checkout -b "$BRANCH"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # 合并上游更新（冲突时全部以上游为准）
           git merge upstream/v4 --no-edit -X theirs || {
-            echo "合并冲突，使用上游版本"
+            echo "合并冲突，使用上游版本解决"
             git checkout --theirs .
             git add .
             git commit -m "Merge upstream/v4 (conflicts resolved with upstream)"
           }
-          
-          echo "branchname=$BRANCH" >> $GITHUB_OUTPUT
-        id: branch
 
       - name: 应用中文修改
         if: steps.check.outputs.has_updates == 'true'
         run: |
           # 1. 替换搜索关键词为中文
-          cp ./patches/search-queries-zh.json ./src/functions/search-queries.json || true
+          cp ./patches/search-queries-zh.json ./src/functions/search-queries.json
           
-          # 2. 修改 QueryEngine.ts - 去掉国内不适用的查询源
-          sed -i "s/sourceOrder = \['google', 'wikipedia', 'wikirandom', 'hackernews', 'reddit', 'local'\]/sourceOrder = ['google', 'wikipedia', 'local']/" ./src/functions/QueryEngine.ts || true
+          # 2. QueryEngine.ts 中国区适配
+          # 2.1 优先使用本地中文词库，再使用在线源
+          sed -i "s/sourceOrder = \['google', 'wikipedia', 'wikirandom', 'hackernews', 'reddit', 'local'\]/sourceOrder = ['local', 'google', 'wikipedia']/" ./src/functions/QueryEngine.ts || true
+          sed -i "s/sourceOrder = \['google', 'wikipedia', 'local'\]/sourceOrder = ['local', 'google', 'wikipedia']/" ./src/functions/QueryEngine.ts || true
+          
+          # 2.2 CN 地区 Google Trends 不回退到 US，避免英文热词污染
+          sed -i "s/if (mapped.length < 90 && geoLocale !== 'US') {/if (mapped.length < 90 \&\& geoLocale !== 'US' \&\& geoLocale !== 'CN') {/" ./src/functions/QueryEngine.ts || true
           
           # 3. 修改 env.example - 默认中国区
           sed -i 's|#ACCOUNT_1_GEO_LOCALE=auto|ACCOUNT_1_GEO_LOCALE=CN    # 中国地区设为CN|' ./env.example || true
           sed -i 's|#ACCOUNT_1_LANG_CODE=en|ACCOUNT_1_LANG_CODE=zh    # 中文设为zh|' ./env.example || true
 
-      - name: 提交中文修改
-        id: commit
+      - name: 提交并推送到 v4-cn
         if: steps.check.outputs.has_updates == 'true'
         run: |
           git add -A
-          if git diff --staged --quiet; then
-            echo "no_changes=true" >> $GITHUB_OUTPUT
-            echo "没有变更，跳过"
-          else
-            echo "no_changes=false" >> $GITHUB_OUTPUT
-            git commit -m "[CN] 应用中国区适配 v4 - 中文搜索词 + 精简查询源 + 默认CN"
-            git push origin "${{ steps.branch.outputs.branchname }}" --force
+          if ! git diff --staged --quiet; then
+            git commit -m "[CN] 同步上游 v4 并应用中国区适配"
           fi
-
-      - name: 合并到 v4-cn
-        if: steps.check.outputs.has_updates == 'true' && steps.commit.outputs.no_changes != 'true'
-        run: |
-          git checkout v4-cn
-          git merge "${{ steps.branch.outputs.branchname }}" -X theirs --no-edit || {
-            git checkout --theirs .
-            git add .
-            git commit -m "Merge CN patches from ${{ steps.branch.outputs.branchname }}"
-          }
-          git push origin v4-cn
+          
+          if [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/v4-cn)" ]; then
+            echo "v4-cn 已是最新，无需推送"
+          else
+            git push origin HEAD:v4-cn
+          fi
