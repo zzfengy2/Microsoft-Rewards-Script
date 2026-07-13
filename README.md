@@ -62,10 +62,10 @@ ACCOUNT_1_PASSWORD=your_password
 ```
 
 > [!NOTE]
-> Add one `ACCOUNT_N_*` block per account, numbered from 1 with no gaps — the script stops at the first missing `ACCOUNT_N_EMAIL`. Optional per-account fields cover recovery email, locale (`ACCOUNT_N_GEO_LOCALE` defaults to `auto`, the locale of your Microsoft profile), language, proxy, and fingerprint persistence — see [`env.example`](env.example) for all of them.
+> Add one `ACCOUNT_N_*` block per account, numbered from 1 with no gaps - the script stops at the first missing `ACCOUNT_N_EMAIL`. Optional per-account fields cover recovery email, locale (`ACCOUNT_N_GEO_LOCALE` defaults to `auto`, the locale of your Microsoft profile), language, proxy, and fingerprint persistence - see [`env.example`](env.example) for all of them.
 
 > [!TIP]
-> For 2FA accounts, set `ACCOUNT_N_TOTP_SECRET` and the script will generate and enter the 6-digit code automatically. To get the secret: in your Microsoft Security settings open 'Manage how you sign in', add an Authenticator app, and when the QR code appears choose 'enter code manually' — use that code as the value in your `.env`.
+> For 2FA accounts, set `ACCOUNT_N_TOTP_SECRET` and the script will generate and enter the 6-digit code automatically. To get the secret: in your Microsoft Security settings open 'Manage how you sign in', add an Authenticator app, and when the QR code appears choose 'enter code manually' - use that code as the value in your `.env`.
 
 > [!WARNING]
 > You must rebuild your script after making any changes to the `.env`.
@@ -75,7 +75,7 @@ ACCOUNT_1_PASSWORD=your_password
 > [!WARNING]
 > Do **not** skip this step if you are running the script bare metal.
 
-- **Bare metal:**: Copy or rename `config.example.json` to `config.json` (in the project root) and customize your preferences.
+- **Bare metal:** Copy or rename `config.example.json` to `config.json` (in the project root) and customize your preferences.
 - **Docker:** A valid `config.json` is automatically created on first run and saved locally to `./config/`. You can optionally manually create a `config.json` (e.g., if you need to specify regex values) using the provided `config.example.json`
 
 > [!CAUTION]
@@ -100,20 +100,22 @@ ACCOUNT_1_PASSWORD=your_password
 ```
 
 - Review `compose.yaml` to adjust scheduling, timezone, and config options.
-    > [!NOTE]
-    > A valid `config.json` is auto-generated on first run using default values, and saved locally to `./config/`.
-    > Optionally, use `CONFIG_*` variables in the `environment:` section of the `compose.yaml` to customise your options (e.g., clusters, webhook, etc.).
-    > A full list of available options are in the [table below](#configuration-options).
-    > `CONFIG_*` variables are applied on every startup and always take precedence over `./config/config.json`.
+
+> [!NOTE]
+> A valid `config.json` is auto-generated on first run using default values, and saved locally to `./config/`.
+> Optionally, use `CONFIG_*` variables in the `environment:` section of the `compose.yaml` to customise your options (e.g., clusters, webhook, etc.).
+> A full list of available options are in the [table below](#configuration-options).
+> `CONFIG_*` variables are applied on every startup and always take precedence over `./config/config.json`.
 
 > [!TIP]
 > If a new image adds config options you're missing, a warning will appear in the container logs.
-> To update, delete `./config/config.json` and restart — a fresh one will be generated from the latest example, with your `compose.yaml` overrides re-applied.
+> To update, delete `./config/config.json` and restart - a fresh one will be generated from the latest example, with your `compose.yaml` overrides re-applied.
 
 - Start the container: `docker compose up -d`
-    > [!TIP]
-    > Monitor logs with `docker logs microsoft-rewards-script`, useful for viewing passwordless login codes or diagnosing issues.
-    > You can also enable a webhook in `compose.yaml` for notifications.
+
+> [!TIP]
+> Monitor logs with `docker logs microsoft-rewards-script`, useful for viewing passwordless login codes or diagnosing issues.
+> You can also enable a webhook in `compose.yaml` for notifications.
 
 ---
 
@@ -159,6 +161,7 @@ Edit `config.json` to customize behavior, or set `CONFIG_*` environment variable
 | `workers.doDailyCheckIn`       | boolean | `true`  | Complete daily check-in                                                    | `CONFIG_WORKER_DAILY_CHECKIN`        |
 | `workers.doReadToEarn`         | boolean | `true`  | Complete Read-to-Earn                                                      | `CONFIG_WORKER_READ_TO_EARN`         |
 | `workers.doActivateSearchPerk` | boolean | `true`  | Activate the "search Nx more" perk when present (runs after the daily set) | `CONFIG_WORKER_ACTIVATE_SEARCH_PERK` |
+| `workers.doVisualSearch`       | boolean | `false` | Activate the visual-search streak and perform visual searches              | `CONFIG_WORKER_VISUAL_SEARCH`        |
 
 ### Activities
 
@@ -271,6 +274,9 @@ Opt-in features that may change. Disabled by default.
 | ---------------------------------------- | -------- | ---------------------------------------------------- | --------------------------------- | --------------------------------------- |
 | `webhook.discord.enabled`                | boolean  | `false`                                              | Enable Discord webhook            | `CONFIG_DISCORD_ENABLED`                |
 | `webhook.discord.url`                    | string   | `""`                                                 | Discord webhook URL               | `CONFIG_DISCORD_URL`                    |
+| `webhook.telegram.enabled`               | string   | `""`                                                 | Enable Telegram webhook           | `CONFIG_TELEGRAM_ENABLED`               |
+| `webhook.telegram.botToken`              | string   | `""`                                                 | Telegram bot token                | `CONFIG_TELEGRAM_BOTTOKEN`              |
+| `webhook.telegram.chatId`                | string   | `""`                                                 | Telegram chat id                  | `CONFIG_TELEGRAM_CHATID`                |
 | `webhook.ntfy.enabled`                   | boolean  | `false`                                              | Enable ntfy notifications         | `CONFIG_NTFY_ENABLED`                   |
 | `webhook.ntfy.url`                       | string   | `""`                                                 | ntfy server URL                   | `CONFIG_NTFY_URL`                       |
 | `webhook.ntfy.topic`                     | string   | `""`                                                 | ntfy topic                        | `CONFIG_NTFY_TOPIC`                     |
